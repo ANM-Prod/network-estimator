@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Welltower Network Estimator — Switches & Access Points</title>
+<style>
+  :root {
+    --bg: #f4f5f7;
+    --panel: #ffffff;
+    --text: #1a1d23;
+    --muted: #5b6270;
+    --border: #dfe2e8;
+    --accent: #2557d6;
+    --accent-soft: #eaf0ff;
+    --good: #1f8a4c;
+    --shadow: 0 1px 3px rgba(20,22,30,0.08), 0 1px 2px rgba(20,22,30,0.06);
+    --warn-text: #92400e;
+    --warn-bg: #fef3c7;
+    --warn-border: #f5cc7f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14161b;
+      --panel: #1c1f26;
+      --text: #e8e9ec;
+      --muted: #9aa1ad;
+      --border: #2c303a;
+      --accent: #6b93ff;
+      --accent-soft: #202946;
+      --good: #4fbf7e;
+      --shadow: 0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3);
+      --warn-text: #fde68a;
+      --warn-bg: #3f2d0a;
+      --warn-border: #6b4e14;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #14161b;
+    --panel: #1c1f26;
+    --text: #e8e9ec;
+    --muted: #9aa1ad;
+    --border: #2c303a;
+    --accent: #6b93ff;
+    --accent-soft: #202946;
+    --good: #4fbf7e;
+    --shadow: 0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3);
+    --warn-text: #fde68a;
+    --warn-bg: #3f2d0a;
+    --warn-border: #6b4e14;
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f5f7;
+    --panel: #ffffff;
+    --text: #1a1d23;
+    --muted: #5b6270;
+    --border: #dfe2e8;
+    --accent: #2557d6;
+    --accent-soft: #eaf0ff;
+    --good: #1f8a4c;
+    --shadow: 0 1px 3px rgba(20,22,30,0.08), 0 1px 2px rgba(20,22,30,0.06);
+    --warn-text: #92400e;
+    --warn-bg: #fef3c7;
+    --warn-border: #f5cc7f;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 2rem 1rem 4rem;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; }
+  h1 { font-size: 1.5rem; margin: 0 0 0.25rem; }
+  .subtitle { color: var(--muted); margin: 0 0 1.75rem; font-size: 0.95rem; }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    padding: 1.5rem;
+    margin-bottom: 1.25rem;
+  }
+  .card h2 { font-size: 1.05rem; margin: 0 0 1rem; }
+  label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 0.35rem; color: var(--muted); }
+  input[type="number"], select {
+    width: 100%;
+    padding: 0.6rem 0.7rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 0.95rem;
+  }
+  input[type="number"]:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .field { margin-bottom: 1rem; }
+  .field:last-child { margin-bottom: 0; }
+  .hint { font-size: 0.78rem; color: var(--muted); margin-top: 0.3rem; }
+  details { margin-top: 0.5rem; }
+  summary {
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--accent);
+    padding: 0.4rem 0;
+    user-select: none;
+  }
+  .adv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 0.75rem; }
+  @media (max-width: 620px) { .grid2, .adv-grid { grid-template-columns: 1fr; } }
+  .results { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.9rem; }
+  .stat {
+    background: var(--accent-soft);
+    border-radius: 10px;
+    padding: 1rem;
+    text-align: center;
+  }
+  .stat .num { font-size: 1.7rem; font-weight: 700; color: var(--accent); line-height: 1.1; }
+  .stat .label { font-size: 0.75rem; color: var(--muted); margin-top: 0.3rem; }
+  .breakdown {
+    margin-top: 1.25rem;
+    border-top: 1px solid var(--border);
+    padding-top: 1rem;
+    font-size: 0.88rem;
+  }
+  .breakdown table { width: 100%; border-collapse: collapse; }
+  .breakdown td { padding: 0.4rem 0; }
+  .breakdown td:last-child { text-align: right; font-weight: 600; }
+  .breakdown tr + tr td { border-top: 1px solid var(--border); }
+  .note {
+    font-size: 0.8rem;
+    color: var(--muted);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.75rem 0.9rem;
+    margin-top: 1rem;
+  }
+  .warning {
+    display: none;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--warn-text);
+    background: var(--warn-bg);
+    border: 1px solid var(--warn-border);
+    border-radius: 8px;
+    padding: 0.75rem 0.9rem;
+    margin-bottom: 1.25rem;
+  }
+  .warning.show { display: block; }
+  .login-wrap {
+    max-width: 340px;
+    margin: 4rem auto;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    padding: 1.5rem;
+  }
+  .login-wrap h1 { margin: 0 0 1rem; font-size: 1.25rem; }
+  .login-wrap .field { margin-bottom: 1rem; }
+  .login-wrap label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 0.3rem; }
+  .login-wrap input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.5rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 0.95rem;
+  }
+  .login-wrap button {
+    width: 100%;
+    padding: 0.55rem;
+    border: none;
+    border-radius: 6px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 0.95rem;
+    cursor: pointer;
+  }
+  .login-error {
+    display: none;
+    color: #b3261e;
+    font-size: 0.85rem;
+    margin-bottom: 1rem;
+  }
+  .login-error.show { display: block; }
+  #app { display: none; }
+</style>
+</head>
+<body>
+<div class="login-wrap" id="loginScreen">
+  <h1>Welltower Network Estimator — Sign in</h1>
+  <div class="login-error" id="loginError">Incorrect username or password.</div>
+  <form id="loginForm">
+    <div class="field">
+      <label for="loginUser">Username</label>
+      <input type="text" id="loginUser" autocomplete="username" autofocus>
+    </div>
+    <div class="field">
+      <label for="loginPass">Password</label>
+      <input type="password" id="loginPass" autocomplete="current-password">
+    </div>
+    <button type="submit">Sign in</button>
+  </form>
+</div>
+<div class="wrap" id="app">
+  <h1>Welltower Network Estimator</h1>
+  <p class="subtitle">Estimate access points and switch counts from square footage. Assumptions are editable — treat results as a rough-order-of-magnitude starting point, not a final design.</p>
+
+  <div class="card">
+    <h2>Building</h2>
+    <div class="grid2">
+      <div class="field">
+        <label for="sqft">Square footage</label>
+        <input type="number" id="sqft" value="50000" min="0" max="150000" step="100">
+        <div class="warning" id="sqftError" style="margin-top: 0.5rem; margin-bottom: 0;">The max supported value is 150,000 sq ft.</div>
+      </div>
+      <div class="field">
+        <label for="buildingType">Building type</label>
+        <select id="buildingType">
+          <option value="office">Office</option>
+          <option value="seniorHousing">Senior Housing</option>
+          <option value="custom" selected>Custom</option>
+        </select>
+      </div>
+    </div>
+
+    <details id="advDetails">
+      <summary>Advanced assumptions</summary>
+      <div class="adv-grid">
+        <div class="field">
+          <label for="sqftPerAp">Sq ft covered per access point</label>
+          <input type="number" id="sqftPerAp" min="1" step="50">
+          <div class="hint">Lower = denser coverage (more walls/interference, higher client density, or higher performance target).</div>
+        </div>
+        <div class="field">
+          <label for="apCost">Cost per access point ($)</label>
+          <input type="number" id="apCost" value="2130" min="0" step="10">
+          <div class="hint">Cisco CW9172I-RTG.</div>
+        </div>
+        <div class="field">
+          <label for="sqftPerDrop">Sq ft per wired drop</label>
+          <input type="number" id="sqftPerDrop" min="1" step="10">
+          <div class="hint">Wired end-user/device drops (desks, phones, printers, door access, cameras, etc.), independent of AP count.</div>
+        </div>
+        <div class="field">
+          <label for="switchModel">Switch model</label>
+          <select id="switchModel">
+            <option value="24">Catalyst 9200L (24-port PoE)</option>
+            <option value="48" selected>Catalyst 9200L-48 (48-port PoE)</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="customPorts">Custom ports per switch</label>
+          <input type="number" id="customPorts" value="48" min="1" step="1" disabled>
+        </div>
+        <div class="field">
+          <label for="customCost">Custom cost per switch ($)</label>
+          <input type="number" id="customCost" value="12000" min="0" step="10" disabled>
+        </div>
+        <div class="field">
+          <label for="uplinkReserved">Uplink/stack ports reserved per switch</label>
+          <input type="number" id="uplinkReserved" value="2" min="0" step="1">
+        </div>
+        <div class="field">
+          <label for="sparePct">Spare port capacity (%)</label>
+          <input type="number" id="sparePct" value="20" min="0" step="5">
+          <div class="hint">Headroom for growth/moves without an immediate switch upgrade.</div>
+        </div>
+      </div>
+    </details>
+  </div>
+
+  <div class="card">
+    <h2>Estimate</h2>
+    <div class="warning" id="switchWarning">Larger designs will require validation.</div>
+    <div class="results">
+      <div class="stat"><div class="num" id="outAps">–</div><div class="label">Access points</div></div>
+      <div class="stat"><div class="num" id="outDrops">–</div><div class="label">Wired drops</div></div>
+      <div class="stat"><div class="num" id="outPorts">–</div><div class="label">Edge ports needed (w/ spare)</div></div>
+      <div class="stat"><div class="num" id="outSwitches">–</div><div class="label">Switches required</div></div>
+      <div class="stat"><div class="num" id="outApCost">–</div><div class="label">Estimated AP cost</div></div>
+      <div class="stat"><div class="num" id="outCost">–</div><div class="label">Estimated switch cost</div></div>
+      <div class="stat"><div class="num" id="outWan">–</div><div class="label">WAN appliance</div></div>
+      <div class="stat"><div class="num" id="outGrandTotal">–</div><div class="label">Hardware total (before discount)</div></div>
+      <div class="stat"><div class="num" id="outNetTotal">–</div><div class="label">Hardware total (after discount)</div></div>
+      <div class="stat"><div class="num" id="outInstallCost">–</div><div class="label">Installation cost</div></div>
+      <div class="stat"><div class="num" id="outProjectTotal">–</div><div class="label">Project total (after discount)</div></div>
+      <div class="stat"><div class="num" id="outMonthly">–</div><div class="label">Estimated monthly managed services cost</div></div>
+    </div>
+
+    <div class="breakdown">
+      <table>
+        <tr><td>Access point ports (PoE)</td><td id="bdAps">–</td></tr>
+        <tr><td>Wired drop ports</td><td id="bdDrops">–</td></tr>
+        <tr><td>Subtotal edge ports</td><td id="bdSubtotal">–</td></tr>
+        <tr><td>+ Spare capacity</td><td id="bdSpare">–</td></tr>
+        <tr><td>Total ports to provision</td><td id="bdTotal">–</td></tr>
+        <tr><td>Usable ports per switch (after uplink reserve)</td><td id="bdUsable">–</td></tr>
+        <tr><td>Switches required</td><td id="bdSwitchesFinal">–</td></tr>
+        <tr><td>Total ports actually deployed</td><td id="bdDeployed">–</td></tr>
+        <tr><td>Unused ports remaining</td><td id="bdRemaining">–</td></tr>
+        <tr><td>Cost per access point</td><td id="bdApCostEach">–</td></tr>
+        <tr><td>Total estimated AP cost</td><td id="bdApCostTotal">–</td></tr>
+        <tr><td>Cost per switch</td><td id="bdCostEach">–</td></tr>
+        <tr><td>Aggregation switch (24-port, needed above 8 access switches)</td><td id="bdAggSwitch">–</td></tr>
+        <tr><td>Total estimated switch cost</td><td id="bdCostTotal">–</td></tr>
+        <tr><td>WAN device</td><td id="bdWanModel">–</td></tr>
+        <tr><td>WAN device cost</td><td id="bdWanCost">–</td></tr>
+        <tr><td>Hardware total (APs + switches + WAN, before discount)</td><td id="bdGrandTotal">–</td></tr>
+        <tr><td>Discount</td><td id="bdDiscountAmount">–</td></tr>
+        <tr><td>Hardware total (after discount)</td><td id="bdNetTotal">–</td></tr>
+        <tr><td>AP installation cost</td><td id="bdApInstall">–</td></tr>
+        <tr><td>Switch installation cost</td><td id="bdSwitchInstall">–</td></tr>
+        <tr><td>Flat per-estimate installation fee</td><td id="bdFlatInstall">–</td></tr>
+        <tr><td>Total installation cost</td><td id="bdInstallTotal">–</td></tr>
+        <tr><td>Project total (hardware after discount + installation)</td><td id="bdProjectTotal">–</td></tr>
+      </table>
+      <table style="margin-top: 1rem;">
+        <tr><td>Monthly switch cost</td><td id="bdMonthlySwitch">–</td></tr>
+        <tr><td>Monthly AP cost</td><td id="bdMonthlyAp">–</td></tr>
+        <tr><td>Monthly edge firewall cost</td><td id="bdMonthlyFirewall">–</td></tr>
+        <tr><td>Monthly per-estimate fee</td><td id="bdMonthlyFee">–</td></tr>
+        <tr><td>Total estimated monthly cost</td><td id="bdMonthlyTotal">–</td></tr>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  const PRESETS = {
+    office:        { sqftPerAp: 2500, sqftPerDrop: 200 },
+    seniorHousing: { sqftPerAp: 1200, sqftPerDrop: 400 },
+    custom:        { sqftPerAp: 2750, sqftPerDrop: 300 }
+  };
+
+  const SWITCH_COSTS = { '24': 8000, '48': 12000 };
+  const AGGREGATION_THRESHOLD = 8;
+  const AGGREGATION_SWITCH_COST = SWITCH_COSTS['24'];
+  const MONTHLY_PER_SWITCH = 40;
+  const MONTHLY_PER_AP = 6.52;
+  const MONTHLY_PER_FIREWALL = 162.00;
+  const MONTHLY_ESTIMATE_FEE = 82.22;
+  const INSTALL_PER_AP = 75;
+  const INSTALL_PER_SWITCH = 600;
+  const INSTALL_FLAT_FEE = 5000;
+  const DISCOUNT_PCT = 55;
+
+  const el = id => document.getElementById(id);
+  const sqft = el('sqft'), buildingType = el('buildingType');
+  const sqftPerAp = el('sqftPerAp'), sqftPerDrop = el('sqftPerDrop'), apCost = el('apCost');
+  const switchModel = el('switchModel'), customPorts = el('customPorts'), customCost = el('customCost');
+  const uplinkReserved = el('uplinkReserved'), sparePct = el('sparePct');
+
+  function applyPreset() {
+    const p = PRESETS[buildingType.value] || PRESETS.custom;
+    sqftPerAp.value = p.sqftPerAp;
+    sqftPerDrop.value = p.sqftPerDrop;
+    calculate();
+  }
+
+  function switchInfo() {
+    if (switchModel.value === 'custom') {
+      customPorts.disabled = false;
+      customCost.disabled = false;
+      return {
+        ports: Math.max(1, Number(customPorts.value) || 1),
+        cost: Math.max(0, Number(customCost.value) || 0)
+      };
+    }
+    customPorts.disabled = true;
+    customCost.disabled = true;
+    return { ports: Number(switchModel.value), cost: SWITCH_COSTS[switchModel.value] };
+  }
+
+  function calculate() {
+    const rawSqft = Number(sqft.value) || 0;
+    el('sqftError').classList.toggle('show', rawSqft > 150000);
+    const area = Math.min(150000, Math.max(0, rawSqft));
+    const apDensity = Math.max(1, Number(sqftPerAp.value) || 1);
+    const dropDensity = Math.max(1, Number(sqftPerDrop.value) || 1);
+    const spare = Math.max(0, Number(sparePct.value) || 0) / 100;
+    const reserve = Math.max(0, Number(uplinkReserved.value) || 0);
+    const { ports: perSwitch, cost: costEach } = switchInfo();
+    const usablePerSwitch = Math.max(1, perSwitch - reserve);
+
+    const aps = Math.ceil(area / apDensity);
+    const drops = Math.ceil(area / dropDensity);
+    const subtotal = aps + drops;
+    const totalWithSpare = Math.ceil(subtotal * (1 + spare));
+    const switchesNeeded = Math.max(1, Math.ceil(totalWithSpare / usablePerSwitch));
+    const switches = Math.min(10, switchesNeeded);
+    el('switchWarning').classList.toggle('show', switchesNeeded > 10);
+    const deployedPorts = switches * usablePerSwitch;
+    const remaining = deployedPorts - subtotal;
+    const apCostEach = Math.max(0, Number(apCost.value) || 0);
+    const totalApCost = aps * apCostEach;
+    const needsAggregation = switches > AGGREGATION_THRESHOLD;
+    const aggSwitchCost = needsAggregation ? AGGREGATION_SWITCH_COST : 0;
+    const totalSwitchCost = switches * costEach + aggSwitchCost;
+    const wan = area >= 100000 ? { model: 'MX105', cost: 32000 } : { model: 'MX85', cost: 11000 };
+    const grandTotal = totalApCost + totalSwitchCost + wan.cost;
+    const discount = DISCOUNT_PCT;
+    const discountAmount = grandTotal * (discount / 100);
+    const netTotal = grandTotal - discountAmount;
+
+    const totalSwitchesInstalled = switches + (needsAggregation ? 1 : 0);
+    const apInstallCost = aps * INSTALL_PER_AP;
+    const switchInstallCost = totalSwitchesInstalled * INSTALL_PER_SWITCH;
+    const installTotal = apInstallCost + switchInstallCost + INSTALL_FLAT_FEE;
+    const projectTotal = netTotal + installTotal;
+
+    const monthlySwitchCost = (switches + (needsAggregation ? 1 : 0)) * MONTHLY_PER_SWITCH;
+    const monthlyApCost = aps * MONTHLY_PER_AP;
+    const monthlyFirewallCost = MONTHLY_PER_FIREWALL;
+    const monthlyTotal = monthlySwitchCost + monthlyApCost + monthlyFirewallCost + MONTHLY_ESTIMATE_FEE;
+
+    const money = n => '$' + n.toLocaleString(undefined, { maximumFractionDigits: 0 });
+    const moneyCents = n => '$' + n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+    el('outAps').textContent = aps.toLocaleString();
+    el('outDrops').textContent = drops.toLocaleString();
+    el('outPorts').textContent = totalWithSpare.toLocaleString();
+    el('outSwitches').textContent = switches.toLocaleString() + (needsAggregation ? ' + 1 agg' : '');
+    el('outApCost').textContent = money(totalApCost);
+    el('outCost').textContent = money(totalSwitchCost);
+    el('outWan').textContent = wan.model;
+    el('outGrandTotal').textContent = money(grandTotal);
+    el('outNetTotal').textContent = money(netTotal);
+    el('outInstallCost').textContent = money(installTotal);
+    el('outProjectTotal').textContent = money(projectTotal);
+    el('outMonthly').textContent = moneyCents(monthlyTotal) + '/mo';
+
+    el('bdAps').textContent = aps.toLocaleString();
+    el('bdDrops').textContent = drops.toLocaleString();
+    el('bdSubtotal').textContent = subtotal.toLocaleString();
+    el('bdSpare').textContent = '+' + (totalWithSpare - subtotal).toLocaleString();
+    el('bdTotal').textContent = totalWithSpare.toLocaleString();
+    el('bdUsable').textContent = usablePerSwitch.toLocaleString() + ' (of ' + perSwitch + ')';
+    el('bdSwitchesFinal').textContent = switches.toLocaleString();
+    el('bdDeployed').textContent = deployedPorts.toLocaleString();
+    el('bdRemaining').textContent = remaining.toLocaleString();
+    el('bdApCostEach').textContent = money(apCostEach);
+    el('bdApCostTotal').textContent = money(totalApCost);
+    el('bdCostEach').textContent = money(costEach);
+    el('bdAggSwitch').textContent = needsAggregation ? money(aggSwitchCost) + ' (1x)' : 'Not needed';
+    el('bdCostTotal').textContent = money(totalSwitchCost);
+    el('bdWanModel').textContent = wan.model + ' (1x)';
+    el('bdWanCost').textContent = money(wan.cost);
+    el('bdGrandTotal').textContent = money(grandTotal);
+    el('bdDiscountAmount').textContent = '−' + money(discountAmount) + ' (' + discount + '%)';
+    el('bdNetTotal').textContent = money(netTotal);
+    el('bdApInstall').textContent = money(apInstallCost) + ' (' + aps + ' × ' + money(INSTALL_PER_AP) + ')';
+    el('bdSwitchInstall').textContent = money(switchInstallCost) + ' (' + totalSwitchesInstalled + ' × ' + money(INSTALL_PER_SWITCH) + ')';
+    el('bdFlatInstall').textContent = money(INSTALL_FLAT_FEE);
+    el('bdInstallTotal').textContent = money(installTotal);
+    el('bdProjectTotal').textContent = money(projectTotal);
+
+    el('bdMonthlySwitch').textContent = moneyCents(monthlySwitchCost) + ' (' + (switches + (needsAggregation ? 1 : 0)) + ' × ' + moneyCents(MONTHLY_PER_SWITCH) + ')';
+    el('bdMonthlyAp').textContent = moneyCents(monthlyApCost) + ' (' + aps + ' × ' + moneyCents(MONTHLY_PER_AP) + ')';
+    el('bdMonthlyFirewall').textContent = moneyCents(monthlyFirewallCost) + ' (1 × ' + moneyCents(MONTHLY_PER_FIREWALL) + ')';
+    el('bdMonthlyFee').textContent = moneyCents(MONTHLY_ESTIMATE_FEE);
+    el('bdMonthlyTotal').textContent = moneyCents(monthlyTotal) + '/mo';
+  }
+
+  [sqft, sqftPerAp, sqftPerDrop, apCost, uplinkReserved, sparePct, customPorts, customCost].forEach(i => i.addEventListener('input', calculate));
+  switchModel.addEventListener('change', calculate);
+  buildingType.addEventListener('change', applyPreset);
+
+  applyPreset();
+
+  const AUTH_USER = 'welltower';
+  const AUTH_PASS = 'anmrocks';
+  const loginScreen = el('loginScreen');
+  const app = el('app');
+  const loginForm = el('loginForm');
+  const loginError = el('loginError');
+
+  function showApp() {
+    loginScreen.style.display = 'none';
+    app.style.display = 'block';
+  }
+
+  if (sessionStorage.getItem('deNileAuthed') === 'true') {
+    showApp();
+  }
+
+  loginForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    const user = el('loginUser').value.trim();
+    const pass = el('loginPass').value;
+    if (user === AUTH_USER && pass === AUTH_PASS) {
+      sessionStorage.setItem('deNileAuthed', 'true');
+      loginError.classList.remove('show');
+      showApp();
+    } else {
+      loginError.classList.add('show');
+    }
+  });
+</script>
+</body>
+</html>
