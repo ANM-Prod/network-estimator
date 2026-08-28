@@ -18,6 +18,8 @@
     --warn-text: #92400e;
     --warn-bg: #fef3c7;
     --warn-border: #f5cc7f;
+    --highlight: #b5710a;
+    --highlight-soft: #fdeed2;
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -33,6 +35,8 @@
       --warn-text: #fde68a;
       --warn-bg: #3f2d0a;
       --warn-border: #6b4e14;
+      --highlight: #ffb84d;
+      --highlight-soft: #3a2a10;
     }
   }
   :root[data-theme="dark"] {
@@ -48,6 +52,8 @@
     --warn-text: #fde68a;
     --warn-bg: #3f2d0a;
     --warn-border: #6b4e14;
+    --highlight: #ffb84d;
+    --highlight-soft: #3a2a10;
   }
   :root[data-theme="light"] {
     --bg: #f4f5f7;
@@ -62,6 +68,8 @@
     --warn-text: #92400e;
     --warn-bg: #fef3c7;
     --warn-border: #f5cc7f;
+    --highlight: #b5710a;
+    --highlight-soft: #fdeed2;
   }
   * { box-sizing: border-box; }
   body {
@@ -118,6 +126,8 @@
   }
   .stat .num { font-size: 1.7rem; font-weight: 700; color: var(--accent); line-height: 1.1; }
   .stat .label { font-size: 0.75rem; color: var(--muted); margin-top: 0.3rem; }
+  .stat.stat-highlight { background: var(--highlight-soft); }
+  .stat.stat-highlight .num { color: var(--highlight); }
   .breakdown {
     margin-top: 1.25rem;
     border-top: 1px solid var(--border);
@@ -288,10 +298,10 @@
       <div class="stat"><div class="num" id="outCost">–</div><div class="label">Estimated switch cost</div></div>
       <div class="stat"><div class="num" id="outWan">–</div><div class="label">WAN appliance</div></div>
       <div class="stat"><div class="num" id="outGrandTotal">–</div><div class="label">Hardware total (before discount)</div></div>
-      <div class="stat"><div class="num" id="outNetTotal">–</div><div class="label">Hardware total (after discount)</div></div>
-      <div class="stat"><div class="num" id="outInstallCost">–</div><div class="label">Installation cost</div></div>
       <div class="stat"><div class="num" id="outProjectTotal">–</div><div class="label">Project total (after discount)</div></div>
-      <div class="stat"><div class="num" id="outMonthly">–</div><div class="label">Estimated monthly managed services cost</div></div>
+      <div class="stat stat-highlight"><div class="num" id="outNetTotal">–</div><div class="label">Hardware total (after discount)</div></div>
+      <div class="stat stat-highlight"><div class="num" id="outInstallCost">–</div><div class="label">Installation cost</div></div>
+      <div class="stat stat-highlight"><div class="num" id="outMonthly">–</div><div class="label">Estimated monthly managed services cost</div></div>
     </div>
 
     <div class="breakdown">
