@@ -117,12 +117,14 @@
   }
   .adv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 0.75rem; }
   @media (max-width: 620px) { .grid2, .adv-grid { grid-template-columns: 1fr; } }
-  .results { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.9rem; }
+  .results { display: flex; flex-direction: column; gap: 0.9rem; }
+  .stat-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.9rem; }
   .stat {
     background: var(--accent-soft);
     border-radius: 10px;
     padding: 1rem;
     text-align: center;
+    flex: 0 1 150px;
   }
   .stat .num { font-size: 1.7rem; font-weight: 700; color: var(--accent); line-height: 1.1; }
   .stat .label { font-size: 0.75rem; color: var(--muted); margin-top: 0.3rem; }
@@ -290,18 +292,24 @@
     <h2>Estimate</h2>
     <div class="warning" id="switchWarning">Larger designs will require validation.</div>
     <div class="results">
-      <div class="stat"><div class="num" id="outAps">–</div><div class="label">Access points</div></div>
-      <div class="stat"><div class="num" id="outDrops">–</div><div class="label">Wired drops</div></div>
-      <div class="stat"><div class="num" id="outPorts">–</div><div class="label">Edge ports needed (w/ spare)</div></div>
-      <div class="stat"><div class="num" id="outSwitches">–</div><div class="label">Switches required</div></div>
-      <div class="stat"><div class="num" id="outApCost">–</div><div class="label">Estimated AP cost</div></div>
-      <div class="stat"><div class="num" id="outCost">–</div><div class="label">Estimated switch cost</div></div>
-      <div class="stat"><div class="num" id="outWan">–</div><div class="label">WAN appliance</div></div>
-      <div class="stat"><div class="num" id="outGrandTotal">–</div><div class="label">Hardware total (before discount)</div></div>
-      <div class="stat"><div class="num" id="outProjectTotal">–</div><div class="label">Project total (after discount)</div></div>
-      <div class="stat stat-highlight"><div class="num" id="outNetTotal">–</div><div class="label">Hardware total (after discount)</div></div>
-      <div class="stat stat-highlight"><div class="num" id="outInstallCost">–</div><div class="label">Installation cost</div></div>
-      <div class="stat stat-highlight"><div class="num" id="outMonthly">–</div><div class="label">Estimated monthly managed services cost</div></div>
+      <div class="stat-row">
+        <div class="stat"><div class="num" id="outAps">–</div><div class="label">Access points</div></div>
+        <div class="stat"><div class="num" id="outDrops">–</div><div class="label">Wired drops</div></div>
+        <div class="stat"><div class="num" id="outPorts">–</div><div class="label">Edge ports needed (w/ spare)</div></div>
+        <div class="stat"><div class="num" id="outSwitches">–</div><div class="label">Switches required</div></div>
+        <div class="stat"><div class="num" id="outApCost">–</div><div class="label">Estimated AP cost</div></div>
+      </div>
+      <div class="stat-row">
+        <div class="stat"><div class="num" id="outCost">–</div><div class="label">Estimated switch cost</div></div>
+        <div class="stat"><div class="num" id="outWan">–</div><div class="label">WAN appliance</div></div>
+        <div class="stat"><div class="num" id="outGrandTotal">–</div><div class="label">Hardware total (before discount)</div></div>
+        <div class="stat"><div class="num" id="outProjectTotal">–</div><div class="label">Project total (after discount)</div></div>
+      </div>
+      <div class="stat-row">
+        <div class="stat stat-highlight"><div class="num" id="outNetTotal">–</div><div class="label">Hardware total (after discount)</div></div>
+        <div class="stat stat-highlight"><div class="num" id="outInstallCost">–</div><div class="label">Installation cost</div></div>
+        <div class="stat stat-highlight"><div class="num" id="outMonthly">–</div><div class="label">Estimated monthly managed services cost</div></div>
+      </div>
     </div>
 
     <div class="breakdown">
