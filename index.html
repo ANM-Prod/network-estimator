@@ -343,17 +343,10 @@
         <tr><td>Hardware total (APs + switches + WAN, before discount)</td><td id="bdGrandTotal">–</td></tr>
         <tr><td>Discount</td><td id="bdDiscountAmount">–</td></tr>
         <tr><td>Hardware total (after discount)</td><td id="bdNetTotal">–</td></tr>
-        <tr><td>AP installation cost</td><td id="bdApInstall">–</td></tr>
-        <tr><td>Switch installation cost</td><td id="bdSwitchInstall">–</td></tr>
-        <tr><td>Flat per-estimate installation fee</td><td id="bdFlatInstall">–</td></tr>
         <tr><td>Total installation cost</td><td id="bdInstallTotal">–</td></tr>
         <tr><td>Project total (hardware after discount + installation)</td><td id="bdProjectTotal">–</td></tr>
       </table>
       <table style="margin-top: 1rem;">
-        <tr><td>Monthly switch cost</td><td id="bdMonthlySwitch">–</td></tr>
-        <tr><td>Monthly AP cost</td><td id="bdMonthlyAp">–</td></tr>
-        <tr><td>Monthly edge firewall cost</td><td id="bdMonthlyFirewall">–</td></tr>
-        <tr><td>Monthly per-estimate fee</td><td id="bdMonthlyFee">–</td></tr>
         <tr><td>Total estimated monthly cost</td><td id="bdMonthlyTotal">–</td></tr>
       </table>
     </div>
@@ -375,8 +368,8 @@
   const MONTHLY_PER_AP = 7.89;
   const MONTHLY_PER_FIREWALL = 196.02;
   const MONTHLY_ESTIMATE_FEE = 99.49;
-  const INSTALL_PER_AP = 75;
-  const INSTALL_PER_SWITCH = 600;
+  const INSTALL_PER_AP = 101.25;
+  const INSTALL_PER_SWITCH = 810;
   const INSTALL_FLAT_FEE = 5000;
   const DISCOUNT_PCT = 55;
 
@@ -484,16 +477,9 @@
     el('bdGrandTotal').textContent = money(grandTotal);
     el('bdDiscountAmount').textContent = '−' + money(discountAmount) + ' (' + discount + '%)';
     el('bdNetTotal').textContent = money(netTotal);
-    el('bdApInstall').textContent = money(apInstallCost) + ' (' + aps + ' × ' + money(INSTALL_PER_AP) + ')';
-    el('bdSwitchInstall').textContent = money(switchInstallCost) + ' (' + totalSwitchesInstalled + ' × ' + money(INSTALL_PER_SWITCH) + ')';
-    el('bdFlatInstall').textContent = money(INSTALL_FLAT_FEE);
     el('bdInstallTotal').textContent = money(installTotal);
     el('bdProjectTotal').textContent = money(projectTotal);
 
-    el('bdMonthlySwitch').textContent = moneyCents(monthlySwitchCost) + ' (' + (switches + (needsAggregation ? 1 : 0)) + ' × ' + moneyCents(MONTHLY_PER_SWITCH) + ')';
-    el('bdMonthlyAp').textContent = moneyCents(monthlyApCost) + ' (' + aps + ' × ' + moneyCents(MONTHLY_PER_AP) + ')';
-    el('bdMonthlyFirewall').textContent = moneyCents(monthlyFirewallCost) + ' (1 × ' + moneyCents(MONTHLY_PER_FIREWALL) + ')';
-    el('bdMonthlyFee').textContent = moneyCents(MONTHLY_ESTIMATE_FEE);
     el('bdMonthlyTotal').textContent = moneyCents(monthlyTotal) + '/mo';
   }
 
