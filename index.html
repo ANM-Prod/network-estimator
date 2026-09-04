@@ -261,7 +261,7 @@
         </div>
         <div class="field">
           <label for="apCost">Cost per access point ($)</label>
-          <input type="number" id="apCost" value="2130" min="0" step="10">
+          <input type="number" id="apCost" value="3357.82" min="0" step="10">
           <div class="hint">Cisco CW9172I-RTG.</div>
         </div>
         <div class="field">
@@ -316,7 +316,7 @@
         <div class="stat"><div class="num" id="outProjectTotal">–</div><div class="label">Project total (after discount)</div></div>
       </div>
       <div class="stat-row">
-        <div class="stat stat-highlight"><div class="num" id="outNetTotal">–</div><div class="label">Hardware total + 3 year licensing/support (after discount)</div></div>
+        <div class="stat stat-highlight"><div class="num" id="outNetTotal">–</div><div class="label">Hardware total + 7 year licensing/support (after discount)</div></div>
         <div class="stat stat-highlight"><div class="num" id="outInstallCost">–</div><div class="label">Installation cost</div></div>
         <div class="stat stat-highlight"><div class="num" id="outMonthly">–</div><div class="label">Estimated monthly managed services cost</div></div>
       </div>
@@ -361,7 +361,7 @@
     custom:        { sqftPerAp: 2750, sqftPerDrop: 300 }
   };
 
-  const SWITCH_COSTS = { '24': 8000, '48': 12000 };
+  const SWITCH_COSTS = { '24': 6069.29, '48': 11793.16 };
   const AGGREGATION_THRESHOLD = 8;
   const AGGREGATION_SWITCH_COST = SWITCH_COSTS['24'];
   const MONTHLY_PER_SWITCH = 48.40;
@@ -425,7 +425,7 @@
     const needsAggregation = switches > AGGREGATION_THRESHOLD;
     const aggSwitchCost = needsAggregation ? AGGREGATION_SWITCH_COST : 0;
     const totalSwitchCost = switches * costEach + aggSwitchCost;
-    const wan = area >= 100000 ? { model: 'MX105', cost: 32000 } : { model: 'MX85', cost: 11000 };
+    const wan = area >= 100000 ? { model: 'MX105', cost: 58978.21 } : { model: 'MX85', cost: 22557.28 };
     const grandTotal = totalApCost + totalSwitchCost + wan.cost;
     const discount = DISCOUNT_PCT;
     const discountAmount = grandTotal * (discount / 100);
