@@ -255,14 +255,17 @@
       <summary>Advanced assumptions</summary>
       <div class="adv-grid">
         <div class="field">
+          <label for="pricingTerm">Pricing term</label>
+          <select id="pricingTerm">
+            <option value="7" selected>7 year</option>
+            <option value="5">5 year</option>
+          </select>
+          <div class="hint">Sets AP, switch, and WAN unit costs from the selected term's price list.</div>
+        </div>
+        <div class="field">
           <label for="sqftPerAp">Sq ft covered per access point</label>
           <input type="number" id="sqftPerAp" min="1" step="50">
           <div class="hint">Lower = denser coverage (more walls/interference, higher client density, or higher performance target).</div>
-        </div>
-        <div class="field">
-          <label for="apCost">Cost per access point ($)</label>
-          <input type="number" id="apCost" value="3357.82" min="0" step="10">
-          <div class="hint">Cisco CW9172I-RTG.</div>
         </div>
         <div class="field">
           <label for="sqftPerDrop">Sq ft per wired drop</label>
@@ -307,16 +310,14 @@
         <div class="stat"><div class="num" id="outDrops">–</div><div class="label">Wired drops</div></div>
         <div class="stat"><div class="num" id="outPorts">–</div><div class="label">Edge ports needed (w/ spare)</div></div>
         <div class="stat"><div class="num" id="outSwitches">–</div><div class="label">Switches required</div></div>
-        <div class="stat"><div class="num" id="outApCost">–</div><div class="label">Estimated AP cost</div></div>
       </div>
       <div class="stat-row">
-        <div class="stat"><div class="num" id="outCost">–</div><div class="label">Estimated switch cost</div></div>
         <div class="stat"><div class="num" id="outWan">–</div><div class="label">WAN appliance</div></div>
         <div class="stat"><div class="num" id="outGrandTotal">–</div><div class="label">Hardware total (before discount)</div></div>
         <div class="stat"><div class="num" id="outProjectTotal">–</div><div class="label">Project total (after discount)</div></div>
       </div>
       <div class="stat-row">
-        <div class="stat stat-highlight"><div class="num" id="outNetTotal">–</div><div class="label">Hardware total + 7 year licensing/support (after discount)</div></div>
+        <div class="stat stat-highlight"><div class="num" id="outNetTotal">–</div><div class="label" id="netTotalLabel">Hardware total + 7 year licensing/support (after discount)</div></div>
         <div class="stat stat-highlight"><div class="num" id="outInstallCost">–</div><div class="label">Installation cost</div></div>
         <div class="stat stat-highlight"><div class="num" id="outMonthly">–</div><div class="label">Estimated monthly managed services cost</div></div>
       </div>
@@ -333,13 +334,7 @@
         <tr><td>Switches required</td><td id="bdSwitchesFinal">–</td></tr>
         <tr><td>Total ports actually deployed</td><td id="bdDeployed">–</td></tr>
         <tr><td>Unused ports remaining</td><td id="bdRemaining">–</td></tr>
-        <tr><td>Cost per access point</td><td id="bdApCostEach">–</td></tr>
-        <tr><td>Total estimated AP cost</td><td id="bdApCostTotal">–</td></tr>
-        <tr><td>Cost per switch</td><td id="bdCostEach">–</td></tr>
-        <tr><td>Aggregation switch (24-port, needed above 8 access switches)</td><td id="bdAggSwitch">–</td></tr>
-        <tr><td>Total estimated switch cost</td><td id="bdCostTotal">–</td></tr>
         <tr><td>WAN device</td><td id="bdWanModel">–</td></tr>
-        <tr><td>WAN device cost</td><td id="bdWanCost">–</td></tr>
         <tr><td>Hardware total (APs + switches + WAN, before discount)</td><td id="bdGrandTotal">–</td></tr>
         <tr><td>Discount</td><td id="bdDiscountAmount">–</td></tr>
         <tr><td>Hardware total (after discount)</td><td id="bdNetTotal">–</td></tr>
@@ -361,9 +356,11 @@
     custom:        { sqftPerAp: 2750, sqftPerDrop: 300 }
   };
 
-  const SWITCH_COSTS = { '24': 6069.29, '48': 11793.16 };
+  const PRICING = {
+    '7': { ap: 3357.82, switch24: 6069.29, switch48: 11793.16, mx85: 22557.28, mx105: 58978.21 },
+    '5': { ap: 2858,    switch24: 5493,    switch48: 10930,    mx85: 17373,    mx105: 45730 }
+  };
   const AGGREGATION_THRESHOLD = 8;
-  const AGGREGATION_SWITCH_COST = SWITCH_COSTS['24'];
   const MONTHLY_PER_SWITCH = 48.40;
   const MONTHLY_PER_AP = 7.89;
   const MONTHLY_PER_FIREWALL = 196.02;
@@ -375,9 +372,14 @@
 
   const el = id => document.getElementById(id);
   const sqft = el('sqft'), buildingType = el('buildingType');
-  const sqftPerAp = el('sqftPerAp'), sqftPerDrop = el('sqftPerDrop'), apCost = el('apCost');
+  const sqftPerAp = el('sqftPerAp'), sqftPerDrop = el('sqftPerDrop');
   const switchModel = el('switchModel'), customPorts = el('customPorts'), customCost = el('customCost');
   const uplinkReserved = el('uplinkReserved'), sparePct = el('sparePct');
+  const pricingTerm = el('pricingTerm');
+
+  function currentPricing() {
+    return PRICING[pricingTerm.value] || PRICING['7'];
+  }
 
   function applyPreset() {
     const p = PRESETS[buildingType.value] || PRESETS.custom;
@@ -386,7 +388,12 @@
     calculate();
   }
 
+  function applyPricing() {
+    calculate();
+  }
+
   function switchInfo() {
+    const prices = currentPricing();
     if (switchModel.value === 'custom') {
       customPorts.disabled = false;
       customCost.disabled = false;
@@ -397,7 +404,7 @@
     }
     customPorts.disabled = true;
     customCost.disabled = true;
-    return { ports: Number(switchModel.value), cost: SWITCH_COSTS[switchModel.value] };
+    return { ports: Number(switchModel.value), cost: switchModel.value === '24' ? prices.switch24 : prices.switch48 };
   }
 
   function calculate() {
@@ -420,12 +427,13 @@
     el('switchWarning').classList.toggle('show', switchesNeeded > 10);
     const deployedPorts = switches * usablePerSwitch;
     const remaining = deployedPorts - subtotal;
-    const apCostEach = Math.max(0, Number(apCost.value) || 0);
+    const prices = currentPricing();
+    const apCostEach = prices.ap;
     const totalApCost = aps * apCostEach;
     const needsAggregation = switches > AGGREGATION_THRESHOLD;
-    const aggSwitchCost = needsAggregation ? AGGREGATION_SWITCH_COST : 0;
+    const aggSwitchCost = needsAggregation ? prices.switch24 : 0;
     const totalSwitchCost = switches * costEach + aggSwitchCost;
-    const wan = area >= 100000 ? { model: 'MX105', cost: 58978.21 } : { model: 'MX85', cost: 22557.28 };
+    const wan = area >= 100000 ? { model: 'MX105', cost: prices.mx105 } : { model: 'MX85', cost: prices.mx85 };
     const grandTotal = totalApCost + totalSwitchCost + wan.cost;
     const discount = DISCOUNT_PCT;
     const discountAmount = grandTotal * (discount / 100);
@@ -449,9 +457,8 @@
     el('outDrops').textContent = drops.toLocaleString();
     el('outPorts').textContent = totalWithSpare.toLocaleString();
     el('outSwitches').textContent = switches.toLocaleString() + (needsAggregation ? ' + 1 agg' : '');
-    el('outApCost').textContent = money(totalApCost);
-    el('outCost').textContent = money(totalSwitchCost);
     el('outWan').textContent = wan.model;
+    el('netTotalLabel').textContent = 'Hardware total + ' + pricingTerm.value + ' year licensing/support (after discount)';
     el('outGrandTotal').textContent = money(grandTotal);
     el('outNetTotal').textContent = money(netTotal);
     el('outInstallCost').textContent = money(installTotal);
@@ -467,13 +474,7 @@
     el('bdSwitchesFinal').textContent = switches.toLocaleString();
     el('bdDeployed').textContent = deployedPorts.toLocaleString();
     el('bdRemaining').textContent = remaining.toLocaleString();
-    el('bdApCostEach').textContent = money(apCostEach);
-    el('bdApCostTotal').textContent = money(totalApCost);
-    el('bdCostEach').textContent = money(costEach);
-    el('bdAggSwitch').textContent = needsAggregation ? money(aggSwitchCost) + ' (1x)' : 'Not needed';
-    el('bdCostTotal').textContent = money(totalSwitchCost);
     el('bdWanModel').textContent = wan.model + ' (1x)';
-    el('bdWanCost').textContent = money(wan.cost);
     el('bdGrandTotal').textContent = money(grandTotal);
     el('bdDiscountAmount').textContent = '−' + money(discountAmount) + ' (' + discount + '%)';
     el('bdNetTotal').textContent = money(netTotal);
@@ -483,11 +484,13 @@
     el('bdMonthlyTotal').textContent = moneyCents(monthlyTotal) + '/mo';
   }
 
-  [sqft, sqftPerAp, sqftPerDrop, apCost, uplinkReserved, sparePct, customPorts, customCost].forEach(i => i.addEventListener('input', calculate));
+  [sqft, sqftPerAp, sqftPerDrop, uplinkReserved, sparePct, customPorts, customCost].forEach(i => i.addEventListener('input', calculate));
   switchModel.addEventListener('change', calculate);
   buildingType.addEventListener('change', applyPreset);
+  pricingTerm.addEventListener('change', applyPricing);
 
   applyPreset();
+  applyPricing();
 
   const AUTH_USER = 'welltower';
   const AUTH_PASS = 'anmrocks';
