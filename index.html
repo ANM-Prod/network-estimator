@@ -297,6 +297,27 @@
           <input type="number" id="sparePct" value="20" min="0" step="5">
           <div class="hint">Headroom for growth/moves without an immediate switch upgrade.</div>
         </div>
+        <div class="field">
+          <label for="includeWan">WAN edge device</label>
+          <label style="display:flex; align-items:center; gap:0.5rem; font-weight:400; color:var(--text);">
+            <input type="checkbox" id="includeWan" checked style="width:auto;">
+            <span>Include WAN appliance (MX firewall/router)</span>
+          </label>
+          <div class="hint">Uncheck if a WAN edge device is out of scope (e.g., customer already has one) to remove it from the estimate.</div>
+        </div>
+        <div class="field">
+          <label for="manualAgg">Aggregation switches</label>
+          <label style="display:flex; align-items:center; gap:0.5rem; font-weight:400; color:var(--text);">
+            <input type="checkbox" id="manualAgg" style="width:auto;">
+            <span>Manually set quantity</span>
+          </label>
+          <div class="hint" id="aggHint">Auto: added when switch count exceeds 8 (adds 1x Catalyst 9200L 24-port).</div>
+        </div>
+        <div class="field">
+          <label for="aggQty">Aggregation switch quantity</label>
+          <input type="number" id="aggQty" value="1" min="0" step="1" disabled>
+          <div class="hint">Overrides the automatic aggregation switch count. Costed at the 24-port switch price.</div>
+        </div>
       </div>
     </details>
   </div>
@@ -332,6 +353,7 @@
         <tr><td>Total ports to provision</td><td id="bdTotal">–</td></tr>
         <tr><td>Usable ports per switch (after uplink reserve)</td><td id="bdUsable">–</td></tr>
         <tr><td>Switches required</td><td id="bdSwitchesFinal">–</td></tr>
+        <tr><td>Aggregation switches</td><td id="bdAggSwitches">–</td></tr>
         <tr><td>Total ports actually deployed</td><td id="bdDeployed">–</td></tr>
         <tr><td>Unused ports remaining</td><td id="bdRemaining">–</td></tr>
         <tr><td>WAN device</td><td id="bdWanModel">–</td></tr>
@@ -376,6 +398,8 @@
   const switchModel = el('switchModel'), customPorts = el('customPorts'), customCost = el('customCost');
   const uplinkReserved = el('uplinkReserved'), sparePct = el('sparePct');
   const pricingTerm = el('pricingTerm');
+  const includeWan = el('includeWan');
+  const manualAgg = el('manualAgg'), aggQty = el('aggQty');
 
   function currentPricing() {
     return PRICING[pricingTerm.value] || PRICING['7'];
@@ -430,24 +454,29 @@
     const prices = currentPricing();
     const apCostEach = prices.ap;
     const totalApCost = aps * apCostEach;
-    const needsAggregation = switches > AGGREGATION_THRESHOLD;
-    const aggSwitchCost = needsAggregation ? prices.switch24 : 0;
+    const autoAggNeeded = switches > AGGREGATION_THRESHOLD;
+    const aggCount = manualAgg.checked ? Math.max(0, Math.floor(Number(aggQty.value)) || 0) : (autoAggNeeded ? 1 : 0);
+    const needsAggregation = aggCount > 0;
+    const aggSwitchCost = aggCount * prices.switch24;
     const totalSwitchCost = switches * costEach + aggSwitchCost;
-    const wan = area >= 100000 ? { model: 'MX105', cost: prices.mx105 } : { model: 'MX85', cost: prices.mx85 };
+    const wanIncluded = includeWan.checked;
+    const wan = wanIncluded
+      ? (area >= 100000 ? { model: 'MX105', cost: prices.mx105 } : { model: 'MX85', cost: prices.mx85 })
+      : { model: 'None', cost: 0 };
     const grandTotal = totalApCost + totalSwitchCost + wan.cost;
     const discount = DISCOUNT_PCT;
     const discountAmount = grandTotal * (discount / 100);
     const netTotal = grandTotal - discountAmount;
 
-    const totalSwitchesInstalled = switches + (needsAggregation ? 1 : 0);
+    const totalSwitchesInstalled = switches + aggCount;
     const apInstallCost = aps * INSTALL_PER_AP;
     const switchInstallCost = totalSwitchesInstalled * INSTALL_PER_SWITCH;
     const installTotal = apInstallCost + switchInstallCost + INSTALL_FLAT_FEE;
     const projectTotal = netTotal + installTotal;
 
-    const monthlySwitchCost = (switches + (needsAggregation ? 1 : 0)) * MONTHLY_PER_SWITCH;
+    const monthlySwitchCost = (switches + aggCount) * MONTHLY_PER_SWITCH;
     const monthlyApCost = aps * MONTHLY_PER_AP;
-    const monthlyFirewallCost = MONTHLY_PER_FIREWALL;
+    const monthlyFirewallCost = wanIncluded ? MONTHLY_PER_FIREWALL : 0;
     const monthlyTotal = monthlySwitchCost + monthlyApCost + monthlyFirewallCost + MONTHLY_ESTIMATE_FEE;
 
     const money = n => '$' + n.toLocaleString(undefined, { maximumFractionDigits: 0 });
@@ -456,7 +485,7 @@
     el('outAps').textContent = aps.toLocaleString();
     el('outDrops').textContent = drops.toLocaleString();
     el('outPorts').textContent = totalWithSpare.toLocaleString();
-    el('outSwitches').textContent = switches.toLocaleString() + (needsAggregation ? ' + 1 agg' : '');
+    el('outSwitches').textContent = switches.toLocaleString() + (needsAggregation ? ' + ' + aggCount.toLocaleString() + ' agg' : '');
     el('outWan').textContent = wan.model;
     el('netTotalLabel').textContent = 'Hardware total + ' + pricingTerm.value + ' year licensing/support (after discount)';
     el('outGrandTotal').textContent = money(grandTotal);
@@ -472,9 +501,13 @@
     el('bdTotal').textContent = totalWithSpare.toLocaleString();
     el('bdUsable').textContent = usablePerSwitch.toLocaleString() + ' (of ' + perSwitch + ')';
     el('bdSwitchesFinal').textContent = switches.toLocaleString();
+    el('bdAggSwitches').textContent = aggCount.toLocaleString() + (manualAgg.checked ? ' (manual)' : (autoAggNeeded ? ' (auto)' : ' (none)'));
+    el('aggHint').textContent = autoAggNeeded
+      ? 'Auto: 1 aggregation switch suggested (switch count ' + switches + ' > 8).'
+      : 'Auto: 0 aggregation switches suggested (switch count ' + switches + ' ≤ 8).';
     el('bdDeployed').textContent = deployedPorts.toLocaleString();
     el('bdRemaining').textContent = remaining.toLocaleString();
-    el('bdWanModel').textContent = wan.model + ' (1x)';
+    el('bdWanModel').textContent = wanIncluded ? wan.model + ' (1x)' : wan.model + ' (excluded)';
     el('bdGrandTotal').textContent = money(grandTotal);
     el('bdDiscountAmount').textContent = '−' + money(discountAmount) + ' (' + discount + '%)';
     el('bdNetTotal').textContent = money(netTotal);
@@ -484,8 +517,10 @@
     el('bdMonthlyTotal').textContent = moneyCents(monthlyTotal) + '/mo';
   }
 
-  [sqft, sqftPerAp, sqftPerDrop, uplinkReserved, sparePct, customPorts, customCost].forEach(i => i.addEventListener('input', calculate));
+  [sqft, sqftPerAp, sqftPerDrop, uplinkReserved, sparePct, customPorts, customCost, aggQty].forEach(i => i.addEventListener('input', calculate));
   switchModel.addEventListener('change', calculate);
+  includeWan.addEventListener('change', calculate);
+  manualAgg.addEventListener('change', () => { aggQty.disabled = !manualAgg.checked; calculate(); });
   buildingType.addEventListener('change', applyPreset);
   pricingTerm.addEventListener('change', applyPricing);
 
