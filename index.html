@@ -497,7 +497,7 @@
     const totalSwitchesInstalled = switches + aggCount;
     const apInstallCost = aps * INSTALL_PER_AP;
     const switchInstallCost = totalSwitchesInstalled * INSTALL_PER_SWITCH;
-    const wanInstallCost = wanIncluded ? INSTALL_PER_WAN : 0;
+    const wanInstallCost = (wanIncluded && vendor.value === 'fortinet') ? INSTALL_PER_WAN : 0;
     const installTotal = apInstallCost + switchInstallCost + wanInstallCost + INSTALL_FLAT_FEE;
     const orderFee = vendor.value === 'fortinet' ? FORTINET_ORDER_FEE : 0;
     const projectTotal = netTotal + installTotal + orderFee;
