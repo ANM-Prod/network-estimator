@@ -255,6 +255,14 @@
       <summary>Advanced assumptions</summary>
       <div class="adv-grid">
         <div class="field">
+          <label for="vendor">Hardware vendor</label>
+          <select id="vendor">
+            <option value="meraki" selected>Meraki</option>
+            <option value="fortinet">Fortinet</option>
+          </select>
+          <div class="hint">Sets AP, switch, and WAN unit costs from the selected vendor's price list.</div>
+        </div>
+        <div class="field">
           <label for="pricingTerm">Pricing term</label>
           <select id="pricingTerm">
             <option value="7" selected>7 year</option>
@@ -275,8 +283,8 @@
         <div class="field">
           <label for="switchModel">Switch model</label>
           <select id="switchModel">
-            <option value="24">Catalyst 9200L (24-port PoE)</option>
-            <option value="48" selected>Catalyst 9200L-48 (48-port PoE)</option>
+            <option value="24" id="switchOpt24">Catalyst 9200L (24-port PoE)</option>
+            <option value="48" id="switchOpt48" selected>Catalyst 9200L-48 (48-port PoE)</option>
             <option value="custom">Custom</option>
           </select>
         </div>
@@ -331,14 +339,10 @@
         <div class="stat"><div class="num" id="outDrops">–</div><div class="label">Wired drops</div></div>
         <div class="stat"><div class="num" id="outPorts">–</div><div class="label">Edge ports needed (w/ spare)</div></div>
         <div class="stat"><div class="num" id="outSwitches">–</div><div class="label">Switches required</div></div>
-      </div>
-      <div class="stat-row">
         <div class="stat"><div class="num" id="outWan">–</div><div class="label">WAN appliance</div></div>
-        <div class="stat"><div class="num" id="outGrandTotal">–</div><div class="label">Hardware total (before discount)</div></div>
-        <div class="stat"><div class="num" id="outProjectTotal">–</div><div class="label">Project total (after discount)</div></div>
       </div>
       <div class="stat-row">
-        <div class="stat stat-highlight"><div class="num" id="outNetTotal">–</div><div class="label" id="netTotalLabel">Hardware total + 7 year licensing/support (after discount)</div></div>
+        <div class="stat stat-highlight"><div class="num" id="outProjectTotal">–</div><div class="label">Project total</div></div>
         <div class="stat stat-highlight"><div class="num" id="outInstallCost">–</div><div class="label">Installation cost</div></div>
         <div class="stat stat-highlight"><div class="num" id="outMonthly">–</div><div class="label">Estimated monthly managed services cost</div></div>
       </div>
@@ -357,11 +361,9 @@
         <tr><td>Total ports actually deployed</td><td id="bdDeployed">–</td></tr>
         <tr><td>Unused ports remaining</td><td id="bdRemaining">–</td></tr>
         <tr><td>WAN device</td><td id="bdWanModel">–</td></tr>
-        <tr><td>Hardware total (APs + switches + WAN, before discount)</td><td id="bdGrandTotal">–</td></tr>
-        <tr><td>Discount</td><td id="bdDiscountAmount">–</td></tr>
-        <tr><td>Hardware total (after discount)</td><td id="bdNetTotal">–</td></tr>
         <tr><td>Total installation cost</td><td id="bdInstallTotal">–</td></tr>
-        <tr><td>Project total (hardware after discount + installation)</td><td id="bdProjectTotal">–</td></tr>
+        <tr><td>Order handling fee</td><td id="bdOrderFee">–</td></tr>
+        <tr><td>Project total</td><td id="bdProjectTotal">–</td></tr>
       </table>
       <table style="margin-top: 1rem;">
         <tr><td>Total estimated monthly cost</td><td id="bdMonthlyTotal">–</td></tr>
@@ -379,8 +381,22 @@
   };
 
   const PRICING = {
-    '7': { ap: 3357.82, switch24: 6069.29, switch48: 11793.16, mx85: 22557.28, mx105: 58978.21 },
-    '5': { ap: 2858,    switch24: 5493,    switch48: 10930,    mx85: 17373,    mx105: 45730 }
+    meraki: {
+      '7': { ap: 3357.82, switch24: 6069.29, switch48: 11793.16, wanSmall: 22557.28, wanLarge: 58978.21, wanSmallModel: 'MX85', wanLargeModel: 'MX105' },
+      '5': { ap: 2858,    switch24: 5493,    switch48: 10930,    wanSmall: 17373,    wanLarge: 45730,    wanSmallModel: 'MX85', wanLargeModel: 'MX105' }
+    },
+    fortinet: {
+      '7': { ap: 1069.10, switch24: 2429.60, switch48: 3820.10, wanSmall: 6383.25, wanLarge: 17024.80, wanSmallModel: 'FG-70G', wanLargeModel: 'FG-90G' },
+      '5': { ap: 768.48,  switch24: 1744.13, switch48: 2742.29, wanSmall: 4245.05, wanLarge: 11692.88, wanSmallModel: 'FG-70G', wanLargeModel: 'FG-90G' }
+    }
+  };
+  const DISCOUNT = {
+    meraki:   { '7': 55, '5': 55 },
+    fortinet: { '7': 10, '5': 12 }
+  };
+  const SWITCH_LABELS = {
+    meraki:   { 24: 'Catalyst 9200L (24-port PoE)',        48: 'Catalyst 9200L-48 (48-port PoE)' },
+    fortinet: { 24: 'FortiSwitch FS-124F-POE (24-port PoE)', 48: 'FortiSwitch FS-148F-POE (48-port PoE)' }
   };
   const AGGREGATION_THRESHOLD = 8;
   const MONTHLY_PER_SWITCH = 48.40;
@@ -389,8 +405,9 @@
   const MONTHLY_ESTIMATE_FEE = 99.49;
   const INSTALL_PER_AP = 101.25;
   const INSTALL_PER_SWITCH = 810;
+  const INSTALL_PER_WAN = 2000;
   const INSTALL_FLAT_FEE = 5000;
-  const DISCOUNT_PCT = 55;
+  const FORTINET_ORDER_FEE = 200;
 
   const el = id => document.getElementById(id);
   const sqft = el('sqft'), buildingType = el('buildingType');
@@ -398,11 +415,20 @@
   const switchModel = el('switchModel'), customPorts = el('customPorts'), customCost = el('customCost');
   const uplinkReserved = el('uplinkReserved'), sparePct = el('sparePct');
   const pricingTerm = el('pricingTerm');
+  const vendor = el('vendor');
   const includeWan = el('includeWan');
   const manualAgg = el('manualAgg'), aggQty = el('aggQty');
 
   function currentPricing() {
-    return PRICING[pricingTerm.value] || PRICING['7'];
+    const vendorPricing = PRICING[vendor.value] || PRICING.meraki;
+    return vendorPricing[pricingTerm.value] || vendorPricing['7'];
+  }
+
+  function applyVendor() {
+    const labels = SWITCH_LABELS[vendor.value] || SWITCH_LABELS.meraki;
+    el('switchOpt24').textContent = labels[24];
+    el('switchOpt48').textContent = labels[48];
+    calculate();
   }
 
   function applyPreset() {
@@ -454,25 +480,27 @@
     const prices = currentPricing();
     const apCostEach = prices.ap;
     const totalApCost = aps * apCostEach;
-    const autoAggNeeded = switches > AGGREGATION_THRESHOLD;
+    const autoAggNeeded = vendor.value === 'fortinet' ? true : switches > AGGREGATION_THRESHOLD;
     const aggCount = manualAgg.checked ? Math.max(0, Math.floor(Number(aggQty.value)) || 0) : (autoAggNeeded ? 1 : 0);
     const needsAggregation = aggCount > 0;
     const aggSwitchCost = aggCount * prices.switch24;
     const totalSwitchCost = switches * costEach + aggSwitchCost;
     const wanIncluded = includeWan.checked;
     const wan = wanIncluded
-      ? (area >= 100000 ? { model: 'MX105', cost: prices.mx105 } : { model: 'MX85', cost: prices.mx85 })
+      ? (area >= 100000 ? { model: prices.wanLargeModel, cost: prices.wanLarge } : { model: prices.wanSmallModel, cost: prices.wanSmall })
       : { model: 'None', cost: 0 };
     const grandTotal = totalApCost + totalSwitchCost + wan.cost;
-    const discount = DISCOUNT_PCT;
+    const discount = (DISCOUNT[vendor.value] || DISCOUNT.meraki)[pricingTerm.value] ?? 55;
     const discountAmount = grandTotal * (discount / 100);
     const netTotal = grandTotal - discountAmount;
 
     const totalSwitchesInstalled = switches + aggCount;
     const apInstallCost = aps * INSTALL_PER_AP;
     const switchInstallCost = totalSwitchesInstalled * INSTALL_PER_SWITCH;
-    const installTotal = apInstallCost + switchInstallCost + INSTALL_FLAT_FEE;
-    const projectTotal = netTotal + installTotal;
+    const wanInstallCost = wanIncluded ? INSTALL_PER_WAN : 0;
+    const installTotal = apInstallCost + switchInstallCost + wanInstallCost + INSTALL_FLAT_FEE;
+    const orderFee = vendor.value === 'fortinet' ? FORTINET_ORDER_FEE : 0;
+    const projectTotal = netTotal + installTotal + orderFee;
 
     const monthlySwitchCost = (switches + aggCount) * MONTHLY_PER_SWITCH;
     const monthlyApCost = aps * MONTHLY_PER_AP;
@@ -487,9 +515,6 @@
     el('outPorts').textContent = totalWithSpare.toLocaleString();
     el('outSwitches').textContent = switches.toLocaleString() + (needsAggregation ? ' + ' + aggCount.toLocaleString() + ' agg' : '');
     el('outWan').textContent = wan.model;
-    el('netTotalLabel').textContent = 'Hardware total + ' + pricingTerm.value + ' year licensing/support (after discount)';
-    el('outGrandTotal').textContent = money(grandTotal);
-    el('outNetTotal').textContent = money(netTotal);
     el('outInstallCost').textContent = money(installTotal);
     el('outProjectTotal').textContent = money(projectTotal);
     el('outMonthly').textContent = moneyCents(monthlyTotal) + '/mo';
@@ -502,16 +527,16 @@
     el('bdUsable').textContent = usablePerSwitch.toLocaleString() + ' (of ' + perSwitch + ')';
     el('bdSwitchesFinal').textContent = switches.toLocaleString();
     el('bdAggSwitches').textContent = aggCount.toLocaleString() + (manualAgg.checked ? ' (manual)' : (autoAggNeeded ? ' (auto)' : ' (none)'));
-    el('aggHint').textContent = autoAggNeeded
-      ? 'Auto: 1 aggregation switch suggested (switch count ' + switches + ' > 8).'
-      : 'Auto: 0 aggregation switches suggested (switch count ' + switches + ' ≤ 8).';
+    el('aggHint').textContent = vendor.value === 'fortinet'
+      ? 'Auto: 1 aggregation switch always included for Fortinet.'
+      : (autoAggNeeded
+        ? 'Auto: 1 aggregation switch suggested (switch count ' + switches + ' > 8).'
+        : 'Auto: 0 aggregation switches suggested (switch count ' + switches + ' ≤ 8).');
     el('bdDeployed').textContent = deployedPorts.toLocaleString();
     el('bdRemaining').textContent = remaining.toLocaleString();
     el('bdWanModel').textContent = wanIncluded ? wan.model + ' (1x)' : wan.model + ' (excluded)';
-    el('bdGrandTotal').textContent = money(grandTotal);
-    el('bdDiscountAmount').textContent = '−' + money(discountAmount) + ' (' + discount + '%)';
-    el('bdNetTotal').textContent = money(netTotal);
     el('bdInstallTotal').textContent = money(installTotal);
+    el('bdOrderFee').textContent = money(orderFee);
     el('bdProjectTotal').textContent = money(projectTotal);
 
     el('bdMonthlyTotal').textContent = moneyCents(monthlyTotal) + '/mo';
@@ -523,8 +548,10 @@
   manualAgg.addEventListener('change', () => { aggQty.disabled = !manualAgg.checked; calculate(); });
   buildingType.addEventListener('change', applyPreset);
   pricingTerm.addEventListener('change', applyPricing);
+  vendor.addEventListener('change', applyVendor);
 
   applyPreset();
+  applyVendor();
   applyPricing();
 
   const AUTH_USER = 'welltower';
