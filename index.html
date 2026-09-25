@@ -276,6 +276,17 @@
           <div class="hint">Lower = denser coverage (more walls/interference, higher client density, or higher performance target).</div>
         </div>
         <div class="field">
+          <label for="apModel">Access point model</label>
+          <select id="apModel">
+            <option value="default" id="apModelDefault" selected>Catalyst CW9172I</option>
+            <option value="custom">Custom</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="customApCost">Custom cost per access point ($)</label>
+          <input type="number" id="customApCost" value="2130" min="0" step="10" disabled>
+        </div>
+        <div class="field">
           <label for="sqftPerDrop">Sq ft per wired drop</label>
           <input type="number" id="sqftPerDrop" min="1" step="10">
           <div class="hint">Wired end-user/device drops (desks, phones, printers, door access, cameras, etc.), independent of AP count.</div>
@@ -314,6 +325,15 @@
           <div class="hint">Uncheck if a WAN edge device is out of scope (e.g., customer already has one) to remove it from the estimate.</div>
         </div>
         <div class="field">
+          <label for="wanModel">WAN device model</label>
+          <select id="wanModel">
+            <option value="auto" selected>Auto (based on building size)</option>
+            <option value="small" id="wanOptSmall">MX85</option>
+            <option value="large" id="wanOptLarge">MX105</option>
+            <option value="fortigate120g" id="wanOptFortigate120g">FG-120G</option>
+          </select>
+        </div>
+        <div class="field">
           <label for="manualAgg">Aggregation switches</label>
           <label style="display:flex; align-items:center; gap:0.5rem; font-weight:400; color:var(--text);">
             <input type="checkbox" id="manualAgg" style="width:auto;">
@@ -325,6 +345,11 @@
           <label for="aggQty">Aggregation switch quantity</label>
           <input type="number" id="aggQty" value="1" min="0" step="1" disabled>
           <div class="hint">Overrides the automatic aggregation switch count. Costed at the 24-port switch price.</div>
+        </div>
+        <div class="field">
+          <label for="miscPct">Misc. items markup (%)</label>
+          <input type="number" id="miscPct" value="0" min="0" step="1">
+          <div class="hint">Buffer for items not itemized above. Applied on top of the discounted hardware total. Default: none.</div>
         </div>
       </div>
     </details>
@@ -361,6 +386,7 @@
         <tr><td>Total ports actually deployed</td><td id="bdDeployed">–</td></tr>
         <tr><td>Unused ports remaining</td><td id="bdRemaining">–</td></tr>
         <tr><td>WAN device</td><td id="bdWanModel">–</td></tr>
+        <tr><td>Misc. items markup</td><td id="bdMiscAmount">–</td></tr>
         <tr><td>Total installation cost</td><td id="bdInstallTotal">–</td></tr>
         <tr><td>Order handling fee</td><td id="bdOrderFee">–</td></tr>
         <tr><td>Project total</td><td id="bdProjectTotal">–</td></tr>
@@ -398,6 +424,9 @@
     meraki:   { 24: 'Catalyst 9200L (24-port PoE)',        48: 'Catalyst 9200L-48 (48-port PoE)' },
     fortinet: { 24: 'FortiSwitch FS-124F-POE (24-port PoE)', 48: 'FortiSwitch FS-148F-POE (48-port PoE)' }
   };
+  const AP_LABELS = { meraki: 'Catalyst CW9172I', fortinet: 'FortiAP 231F' };
+  const FORTIGATE_120G_MODEL = 'FG-120G';
+  const FORTIGATE_120G_COST = { '7': 17127.00, '5': 22324.50 };
   const AGGREGATION_THRESHOLD = 8;
   const MONTHLY_PER_SWITCH = 48.40;
   const MONTHLY_PER_AP = 7.89;
@@ -417,17 +446,36 @@
   const pricingTerm = el('pricingTerm');
   const vendor = el('vendor');
   const includeWan = el('includeWan');
+  const wanModel = el('wanModel');
+  const apModel = el('apModel'), customApCost = el('customApCost');
   const manualAgg = el('manualAgg'), aggQty = el('aggQty');
+  const miscPct = el('miscPct');
 
   function currentPricing() {
     const vendorPricing = PRICING[vendor.value] || PRICING.meraki;
     return vendorPricing[pricingTerm.value] || vendorPricing['7'];
   }
 
+  function refreshLabels() {
+    const switchLabels = SWITCH_LABELS[vendor.value] || SWITCH_LABELS.meraki;
+    el('switchOpt24').textContent = switchLabels[24];
+    el('switchOpt48').textContent = switchLabels[48];
+    el('apModelDefault').textContent = AP_LABELS[vendor.value] || AP_LABELS.meraki;
+    const prices = currentPricing();
+    el('wanOptSmall').textContent = prices.wanSmallModel;
+    el('wanOptLarge').textContent = prices.wanLargeModel;
+
+    const fortigateOpt = el('wanOptFortigate120g');
+    const fortigateAvailable = vendor.value === 'fortinet';
+    fortigateOpt.hidden = !fortigateAvailable;
+    fortigateOpt.disabled = !fortigateAvailable;
+    if (!fortigateAvailable && wanModel.value === 'fortigate120g') {
+      wanModel.value = 'auto';
+    }
+  }
+
   function applyVendor() {
-    const labels = SWITCH_LABELS[vendor.value] || SWITCH_LABELS.meraki;
-    el('switchOpt24').textContent = labels[24];
-    el('switchOpt48').textContent = labels[48];
+    refreshLabels();
     calculate();
   }
 
@@ -439,7 +487,18 @@
   }
 
   function applyPricing() {
+    refreshLabels();
     calculate();
+  }
+
+  function apInfo() {
+    const prices = currentPricing();
+    if (apModel.value === 'custom') {
+      customApCost.disabled = false;
+      return { cost: Math.max(0, Number(customApCost.value) || 0) };
+    }
+    customApCost.disabled = true;
+    return { cost: prices.ap };
   }
 
   function switchInfo() {
@@ -478,7 +537,7 @@
     const deployedPorts = switches * usablePerSwitch;
     const remaining = deployedPorts - subtotal;
     const prices = currentPricing();
-    const apCostEach = prices.ap;
+    const apCostEach = apInfo().cost;
     const totalApCost = aps * apCostEach;
     const autoAggNeeded = vendor.value === 'fortinet' ? true : switches > AGGREGATION_THRESHOLD;
     const aggCount = manualAgg.checked ? Math.max(0, Math.floor(Number(aggQty.value)) || 0) : (autoAggNeeded ? 1 : 0);
@@ -486,21 +545,37 @@
     const aggSwitchCost = aggCount * prices.switch24;
     const totalSwitchCost = switches * costEach + aggSwitchCost;
     const wanIncluded = includeWan.checked;
-    const wan = wanIncluded
-      ? (area >= 100000 ? { model: prices.wanLargeModel, cost: prices.wanLarge } : { model: prices.wanSmallModel, cost: prices.wanSmall })
-      : { model: 'None', cost: 0 };
-    const grandTotal = totalApCost + totalSwitchCost + wan.cost;
+    wanModel.disabled = !wanIncluded;
+    let wan, wanDiscountExempt = false;
+    if (!wanIncluded) {
+      wan = { model: 'None', cost: 0 };
+    } else if (wanModel.value === 'small') {
+      wan = { model: prices.wanSmallModel, cost: prices.wanSmall };
+    } else if (wanModel.value === 'large') {
+      wan = { model: prices.wanLargeModel, cost: prices.wanLarge };
+    } else if (wanModel.value === 'fortigate120g') {
+      wan = { model: FORTIGATE_120G_MODEL, cost: FORTIGATE_120G_COST[pricingTerm.value] ?? FORTIGATE_120G_COST['7'] };
+      wanDiscountExempt = true;
+    } else {
+      wan = area >= 100000 ? { model: prices.wanLargeModel, cost: prices.wanLarge } : { model: prices.wanSmallModel, cost: prices.wanSmall };
+    }
+    const wanDiscountableCost = wanDiscountExempt ? 0 : wan.cost;
+    const wanExemptCost = wanDiscountExempt ? wan.cost : 0;
+    const grandTotal = totalApCost + totalSwitchCost + wanDiscountableCost;
     const discount = (DISCOUNT[vendor.value] || DISCOUNT.meraki)[pricingTerm.value] ?? 55;
     const discountAmount = grandTotal * (discount / 100);
-    const netTotal = grandTotal - discountAmount;
+    const netTotal = grandTotal - discountAmount + wanExemptCost;
+    const miscRate = Math.max(0, Number(miscPct.value) || 0) / 100;
+    const miscAmount = netTotal * miscRate;
 
     const totalSwitchesInstalled = switches + aggCount;
     const apInstallCost = aps * INSTALL_PER_AP;
     const switchInstallCost = totalSwitchesInstalled * INSTALL_PER_SWITCH;
-    const wanInstallCost = (wanIncluded && vendor.value === 'fortinet') ? INSTALL_PER_WAN : 0;
+    const wanIsFortinetDevice = vendor.value === 'fortinet' || wanModel.value === 'fortigate120g';
+    const wanInstallCost = (wanIncluded && wanIsFortinetDevice) ? INSTALL_PER_WAN : 0;
     const installTotal = apInstallCost + switchInstallCost + wanInstallCost + INSTALL_FLAT_FEE;
     const orderFee = vendor.value === 'fortinet' ? FORTINET_ORDER_FEE : 0;
-    const projectTotal = netTotal + installTotal + orderFee;
+    const projectTotal = netTotal + miscAmount + installTotal + orderFee;
 
     const monthlySwitchCost = (switches + aggCount) * MONTHLY_PER_SWITCH;
     const monthlyApCost = aps * MONTHLY_PER_AP;
@@ -534,7 +609,8 @@
         : 'Auto: 0 aggregation switches suggested (switch count ' + switches + ' ≤ 8).');
     el('bdDeployed').textContent = deployedPorts.toLocaleString();
     el('bdRemaining').textContent = remaining.toLocaleString();
-    el('bdWanModel').textContent = wanIncluded ? wan.model + ' (1x)' : wan.model + ' (excluded)';
+    el('bdWanModel').textContent = wanIncluded ? wan.model + (wanDiscountExempt ? ' (1x, no discount)' : ' (1x)') : wan.model + ' (excluded)';
+    el('bdMiscAmount').textContent = miscRate > 0 ? money(miscAmount) + ' (' + (miscRate * 100).toLocaleString() + '%)' : 'None';
     el('bdInstallTotal').textContent = money(installTotal);
     el('bdOrderFee').textContent = money(orderFee);
     el('bdProjectTotal').textContent = money(projectTotal);
@@ -542,9 +618,11 @@
     el('bdMonthlyTotal').textContent = moneyCents(monthlyTotal) + '/mo';
   }
 
-  [sqft, sqftPerAp, sqftPerDrop, uplinkReserved, sparePct, customPorts, customCost, aggQty].forEach(i => i.addEventListener('input', calculate));
+  [sqft, sqftPerAp, sqftPerDrop, uplinkReserved, sparePct, customPorts, customCost, customApCost, aggQty, miscPct].forEach(i => i.addEventListener('input', calculate));
   switchModel.addEventListener('change', calculate);
+  apModel.addEventListener('change', calculate);
   includeWan.addEventListener('change', calculate);
+  wanModel.addEventListener('change', calculate);
   manualAgg.addEventListener('change', () => { aggQty.disabled = !manualAgg.checked; calculate(); });
   buildingType.addEventListener('change', applyPreset);
   pricingTerm.addEventListener('change', applyPricing);
