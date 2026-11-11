@@ -259,13 +259,14 @@
           <select id="vendor">
             <option value="meraki" selected>Meraki</option>
             <option value="fortinet">Fortinet</option>
+            <option value="juniper">Juniper</option>
           </select>
           <div class="hint">Sets AP, switch, and WAN unit costs from the selected vendor's price list.</div>
         </div>
         <div class="field">
           <label for="pricingTerm">Pricing term</label>
           <select id="pricingTerm">
-            <option value="7" selected>7 year</option>
+            <option value="7" id="termOpt7" selected>7 year</option>
             <option value="5">5 year</option>
           </select>
           <div class="hint">Sets AP, switch, and WAN unit costs from the selected term's price list.</div>
@@ -414,17 +415,22 @@
     fortinet: {
       '7': { ap: 1069.10, switch24: 2429.60, switch48: 3820.10, wanSmall: 6383.25, wanLarge: 17024.80, wanSmallModel: 'FG-70G', wanLargeModel: 'FG-90G' },
       '5': { ap: 768.48,  switch24: 1744.13, switch48: 2742.29, wanSmall: 4245.05, wanLarge: 11692.88, wanSmallModel: 'FG-70G', wanLargeModel: 'FG-90G' }
+    },
+    juniper: {
+      '5': { ap: 2443.52, switch24: 4858.46, switch48: 7605.55, wanSmall: 7151.83, wanLarge: 8134.31, wanSmallModel: 'SRX345', wanLargeModel: 'SRX400', agg: 11112.17, aggModel: 'EX4400-24X' }
     }
   };
   const DISCOUNT = {
     meraki:   { '7': 55, '5': 55 },
-    fortinet: { '7': 10, '5': 12 }
+    fortinet: { '7': 10, '5': 12 },
+    juniper:  { '5': 0 }
   };
   const SWITCH_LABELS = {
     meraki:   { 24: 'Catalyst 9200L (24-port PoE)',        48: 'Catalyst 9200L-48 (48-port PoE)' },
-    fortinet: { 24: 'FortiSwitch FS-124F-POE (24-port PoE)', 48: 'FortiSwitch FS-148F-POE (48-port PoE)' }
+    fortinet: { 24: 'FortiSwitch FS-124F-POE (24-port PoE)', 48: 'FortiSwitch FS-148F-POE (48-port PoE)' },
+    juniper:  { 24: 'Juniper EX4100-24P (24-port PoE)',      48: 'Juniper EX4100-48P (48-port PoE)' }
   };
-  const AP_LABELS = { meraki: 'Catalyst CW9172I', fortinet: 'FortiAP 231F' };
+  const AP_LABELS = { meraki: 'Catalyst CW9172I', fortinet: 'FortiAP 231F', juniper: 'Juniper AP33' };
   const FORTIGATE_120G_MODEL = 'FG-120G';
   const FORTIGATE_120G_COST = { '7': 17127.00, '5': 22324.50 };
   const AGGREGATION_THRESHOLD = 8;
@@ -457,11 +463,19 @@
   }
 
   function refreshLabels() {
+    const vendorPricing = PRICING[vendor.value] || PRICING.meraki;
+    const term7Opt = el('termOpt7');
+    term7Opt.hidden = term7Opt.disabled = !vendorPricing['7'];
+    if (!vendorPricing[pricingTerm.value]) pricingTerm.value = Object.keys(vendorPricing)[0];
+
     const switchLabels = SWITCH_LABELS[vendor.value] || SWITCH_LABELS.meraki;
     el('switchOpt24').textContent = switchLabels[24];
     el('switchOpt48').textContent = switchLabels[48];
     el('apModelDefault').textContent = AP_LABELS[vendor.value] || AP_LABELS.meraki;
     const prices = currentPricing();
+    const apDefaultOpt = el('apModelDefault');
+    apDefaultOpt.disabled = prices.ap == null;
+    if (prices.ap == null) apModel.value = 'custom';
     el('wanOptSmall').textContent = prices.wanSmallModel;
     el('wanOptLarge').textContent = prices.wanLargeModel;
 
@@ -475,6 +489,7 @@
   }
 
   function applyVendor() {
+    apModel.value = 'default';
     refreshLabels();
     calculate();
   }
@@ -542,7 +557,7 @@
     const autoAggNeeded = vendor.value === 'fortinet' ? true : switches > AGGREGATION_THRESHOLD;
     const aggCount = manualAgg.checked ? Math.max(0, Math.floor(Number(aggQty.value)) || 0) : (autoAggNeeded ? 1 : 0);
     const needsAggregation = aggCount > 0;
-    const aggSwitchCost = aggCount * prices.switch24;
+    const aggSwitchCost = aggCount * (prices.agg ?? prices.switch24);
     const totalSwitchCost = switches * costEach + aggSwitchCost;
     const wanIncluded = includeWan.checked;
     wanModel.disabled = !wanIncluded;
@@ -571,8 +586,8 @@
     const totalSwitchesInstalled = switches + aggCount;
     const apInstallCost = aps * INSTALL_PER_AP;
     const switchInstallCost = totalSwitchesInstalled * INSTALL_PER_SWITCH;
-    const wanIsFortinetDevice = vendor.value === 'fortinet' || wanModel.value === 'fortigate120g';
-    const wanInstallCost = (wanIncluded && wanIsFortinetDevice) ? INSTALL_PER_WAN : 0;
+    const wanInstallApplies = vendor.value !== 'meraki' || wanModel.value === 'fortigate120g';
+    const wanInstallCost = (wanIncluded && wanInstallApplies) ? INSTALL_PER_WAN : 0;
     const installTotal = apInstallCost + switchInstallCost + wanInstallCost + INSTALL_FLAT_FEE;
     const orderFee = vendor.value === 'fortinet' ? FORTINET_ORDER_FEE : 0;
     const projectTotal = netTotal + miscAmount + installTotal + orderFee;
@@ -601,7 +616,7 @@
     el('bdTotal').textContent = totalWithSpare.toLocaleString();
     el('bdUsable').textContent = usablePerSwitch.toLocaleString() + ' (of ' + perSwitch + ')';
     el('bdSwitchesFinal').textContent = switches.toLocaleString();
-    el('bdAggSwitches').textContent = aggCount.toLocaleString() + (manualAgg.checked ? ' (manual)' : (autoAggNeeded ? ' (auto)' : ' (none)'));
+    el('bdAggSwitches').textContent = aggCount.toLocaleString() + (prices.aggModel && aggCount > 0 ? ' x ' + prices.aggModel : '') + (manualAgg.checked ? ' (manual)' : (autoAggNeeded ? ' (auto)' : ' (none)'));
     el('aggHint').textContent = vendor.value === 'fortinet'
       ? 'Auto: 1 aggregation switch always included for Fortinet.'
       : (autoAggNeeded
